@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ระบบติดตามการฝึกงานนักศึกษา</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&family=Prompt:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<style>
+:root {
+  --navy: #0f1b2d; --navy2: #162337; --navy3: #1e3050;
+  --accent: #3b9eff; --gold: #f5a623; --green: #22c55e;
+  --red: #ef4444; --orange: #f97316; --purple: #a855f7; --teal: #14b8a6;
+  --text: #e2eaf5; --text2: #8fa3bf; --text3: #4d6680;
+  --border: rgba(59,158,255,0.12); --border2: rgba(59,158,255,0.22);
+  --glass: rgba(15,27,45,0.85);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Sarabun', sans-serif; background: var(--navy); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+header { display: flex; align-items: center; gap: 16px; padding: 10px 20px; background: var(--navy2); border-bottom: 1px solid var(--border2); flex-shrink: 0; z-index: 1000; }
+.logo { width: 36px; height: 36px; background: linear-gradient(135deg, var(--accent), #1a6bd4); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+.header-title { font-family: 'Prompt', sans-serif; font-size: 15px; font-weight: 600; }
+.header-sub { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.header-spacer { flex: 1; }
+.stat-pills { display: flex; gap: 8px; }
+.stat-pill { display: flex; align-items: center; gap: 6px; padding: 5px 12px; background: var(--navy3); border: 1px solid var(--border); border-radius: 20px; font-size: 12px; }
+.stat-pill .num { font-weight: 600; font-size: 14px; }
+.stat-pill .lbl { color: var(--text2); font-size: 11px; }
+.search-wrap { display: flex; align-items: center; gap: 8px; background: var(--navy3); border: 1px solid var(--border2); border-radius: 8px; padding: 6px 12px; min-width: 200px; }
+.search-wrap input { background: transparent; border: none; outline: none; color: var(--text); font-family: 'Sarabun', sans-serif; font-size: 13px; width: 100%; }
+.search-wrap input::placeholder { color: var(--text3); }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+.sidebar { width: 300px; flex-shrink: 0; display: flex; flex-direction: column; background: var(--navy2); border-right: 1px solid var(--border); overflow: hidden; }
+.filter-bar { padding: 12px 14px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+.filter-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; color: var(--text2); font-weight: 500; margin-bottom: 2px; }
+.chip { padding: 4px 10px; border-radius: 14px; border: 1px solid var(--border2); font-size: 11px; cursor: pointer; transition: all .15s; color: var(--text2); background: var(--navy3); white-space: nowrap; }
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500; }
+.chip:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+.list-header { padding: 8px 14px; font-size: 11px; color: var(--text2); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.count-badge { background: var(--navy3); border: 1px solid var(--border); border-radius: 10px; padding: 1px 7px; font-size: 10px; color: var(--accent); }
+.student-list { overflow-y: auto; flex: 1; }
+.student-list::-webkit-scrollbar { width: 4px; }
+.student-list::-webkit-scrollbar-thumb { background: var(--navy3); border-radius: 4px; }
+.student-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .12s; }
+.student-item:hover { background: var(--navy3); }
+.student-item.active { background: rgba(59,158,255,0.1); border-left: 2px solid var(--accent); }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+.si-info { flex: 1; min-width: 0; }
+.si-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.si-company { font-size: 11px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.si-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.score-badge { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 6px; }
+
+#map { flex: 1; z-index: 1; }
+.leaflet-container { background: #0a1525; }
+.leaflet-tile { filter: brightness(0.75) saturate(0.6) hue-rotate(200deg); }
+.pin-marker { width: 36px; height: 36px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.3); box-shadow: 0 3px 12px rgba(0,0,0,0.5); cursor: pointer; }
+.pin-inner { transform: rotate(45deg); font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+.pin-count { position: absolute; top: -6px; right: -6px; background: #fff; color: #0f1b2d; border-radius: 10px; font-size: 9px; font-weight: 700; padding: 1px 5px; min-width: 16px; text-align: center; }
+
+.detail-panel { width: 290px; flex-shrink: 0; background: var(--navy2); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; }
+.detail-panel::-webkit-scrollbar { width: 4px; }
+.detail-panel::-webkit-scrollbar-thumb { background: var(--navy3); border-radius: 4px; }
+.detail-panel.hidden { display: none; }
+.dp-header { padding: 14px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 12px; }
+.dp-avatar { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; flex-shrink: 0; }
+.dp-name { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.dp-id { font-size: 11px; color: var(--text2); margin-top: 2px; }
+.dp-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.dp-section-title { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 10px; }
+.dp-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.dp-key { font-size: 12px; color: var(--text2); }
+.dp-val { font-size: 12px; font-weight: 500; text-align: right; max-width: 160px; }
+.score-ring { width: 56px; height: 56px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 3px solid; font-size: 20px; font-weight: 700; }
+.eval-comment { font-size: 12px; color: var(--text2); background: var(--navy3); border-radius: 8px; padding: 8px 10px; line-height: 1.6; margin-top: 6px; }
+.status-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+
+.leaflet-popup-content-wrapper { background: var(--navy2) !important; border: 1px solid var(--border2) !important; border-radius: 12px !important; box-shadow: 0 8px 32px rgba(0,0,0,0.6) !important; color: var(--text) !important; font-family: 'Sarabun', sans-serif !important; }
+.leaflet-popup-tip { background: var(--navy2) !important; }
+.leaflet-popup-content { margin: 12px 16px !important; }
+.popup-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+.popup-row { font-size: 11px; color: var(--text2); margin-bottom: 3px; }
+.popup-row span { color: var(--text); font-weight: 500; }
+.popup-students { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+.popup-student-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--navy3); border: 1px solid var(--border); cursor: pointer; }
+.popup-student-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+.legend { position: absolute; bottom: 24px; left: 314px; z-index: 500; background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 14px; font-size: 11px; }
+.legend-title { font-weight: 600; margin-bottom: 7px; color: var(--text2); font-size: 10px; text-transform: uppercase; letter-spacing: .6px; }
+.legend-row { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.empty-state { padding: 32px 16px; text-align: center; color: var(--text2); font-size: 13px; }
+
+/* MODAL */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 9999; display: flex; align-items: center; justify-content: center; }
+.modal-box { background: var(--navy2); border: 1px solid var(--border2); border-radius: 16px; padding: 24px; width: 440px; max-height: 90vh; overflow-y: auto; font-family: 'Sarabun', sans-serif; }
+.modal-box::-webkit-scrollbar { width: 4px; }
+.modal-box::-webkit-scrollbar-thumb { background: var(--navy3); border-radius: 4px; }
+.modal-title { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+.modal-subtitle { font-size: 11px; color: var(--text2); margin-bottom: 16px; }
+.modal-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .8px; color: var(--accent); margin: 16px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border2); }
+.modal-label { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+.modal-input { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border2); background: var(--navy3); color: var(--text); font-family: 'Sarabun', sans-serif; font-size: 13px; outline: none; margin-bottom: 12px; }
+.modal-input:focus { border-color: var(--accent); }
+.modal-row2 { display: flex; gap: 10px; }
+.modal-row2 > div { flex: 1; }
+.modal-btn-row { display: flex; gap: 8px; margin-top: 16px; }
+.btn { padding: 9px 0; border-radius: 8px; font-family: 'Sarabun', sans-serif; font-size: 13px; cursor: pointer; border: none; flex: 1; font-weight: 600; }
+.btn-cancel { background: transparent; border: 1px solid var(--border2); color: var(--text2); }
+.btn-primary { background: var(--accent); color: #fff; }
+.action-btn { width: 100%; padding: 9px; border-radius: 8px; font-family: 'Sarabun', sans-serif; font-size: 13px; cursor: pointer; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">🎓</div>
+  <div>
+    <div class="header-title">ระบบติดตามการฝึกงานนักศึกษา</div>
+    <div class="header-sub">ปีการศึกษา 2568 · มหาวิทยาลัย</div>
+  </div>
+  <div class="header-spacer"></div>
+  <button onclick="showAddModal()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--accent);background:rgba(59,158,255,0.1);color:var(--accent);font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;font-weight:500;margin-right:8px;">
+    ➕ เพิ่มนักศึกษา
+  </button>
+  <div class="stat-pills">
+    <div class="stat-pill"><span class="num" id="stat-students">0</span><span class="lbl">นักศึกษา</span></div>
+    <div class="stat-pill"><span class="num" id="stat-companies">0</span><span class="lbl">บริษัท</span></div>
+    <div class="stat-pill"><span class="num" id="stat-done" style="color:var(--green)">0</span><span class="lbl">นิเทศแล้ว</span></div>
+    <div class="stat-pill"><span class="num" id="stat-avg" style="color:var(--gold)">-</span><span class="lbl">คะแนนเฉลี่ย</span></div>
+  </div>
+  <div class="search-wrap">
+    <span style="color:var(--text3);font-size:14px">🔍</span>
+    <input type="text" id="search" placeholder="ค้นหานักศึกษา / บริษัท..." oninput="applyFilters()"/>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="filter-bar">
+      <div>
+        <div class="filter-label">คณะ</div>
+        <div class="filter-row" id="faculty-chips"></div>
+      </div>
+      <div>
+        <div class="filter-label">สถานะนิเทศ</div>
+        <div class="filter-row">
+          <div class="chip active" data-status="all" onclick="setStatus(this,'all')">ทั้งหมด</div>
+          <div class="chip" data-status="3" onclick="setStatus(this,'3')">✅ นิเทศแล้ว</div>
+          <div class="chip" data-status="2" onclick="setStatus(this,'2')">🔄 รอนิเทศ</div>
+          <div class="chip" data-status="1" onclick="setStatus(this,'1')">⏳ รอจัดสรร</div>
+        </div>
+      </div>
+    </div>
+    <div class="list-header">
+      <span>รายชื่อนักศึกษา</span>
+      <span class="count-badge" id="list-count">0</span>
+    </div>
+    <div class="student-list" id="student-list">
+      <div class="empty-state">กำลังโหลดข้อมูล...</div>
+    </div>
+  </div>
+
+  <div style="position:relative;flex:1;display:flex;overflow:hidden;">
+    <div id="map" style="flex:1;"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <div class="detail-panel hidden" id="detail-panel"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const FACULTY = {
+  1: { name:"คณะเทคโนโลยีสารสนเทศ", short:"IT",  color:"#3b9eff", bg:"rgba(59,158,255,0.15)" },
+  2: { name:"คณะวิศวกรรมศาสตร์",     short:"ENG", color:"#f97316", bg:"rgba(249,115,22,0.15)" },
+  3: { name:"คณะบริหารธุรกิจ",        short:"BUS", color:"#22c55e", bg:"rgba(34,197,94,0.15)"  },
+  4: { name:"คณะวิทยาศาสตร์ประยุกต์", short:"SCI", color:"#a855f7", bg:"rgba(168,85,247,0.15)" },
+  5: { name:"คณะครุศาสตร์อุตสาหกรรม", short:"EDU", color:"#14b8a6", bg:"rgba(20,184,166,0.15)" },
+};
+const COMPANY_TYPE = {
+  1:"IT / Software House", 2:"โรงงานอุตสาหกรรม / ยานยนต์",
+  3:"ธุรกิจบริการ / รัฐวิสาหกิจ", 4:"ธนาคาร / สถาบันการเงิน", 5:"ค้าปลีก / E-Commerce",
+};
+const VISIT_STATUS = {
+  1: { name:"รอจัดสรรอาจารย์",            color:"#ef4444", bg:"rgba(239,68,68,0.12)"  },
+  2: { name:"กำลังดำเนินการ (รอไปนิเทศ)", color:"#f59e0b", bg:"rgba(245,158,11,0.12)" },
+  3: { name:"นิเทศเสร็จสิ้น",             color:"#22c55e", bg:"rgba(34,197,94,0.12)"  },
+};
+
+let STUDENTS=[], COMPANIES=[], TEACHERS=[];
+let activeFilters={ faculty:"all", status:"all", q:"" };
+let selectedId=null, map, mapMarkers={};
+
+function initMap() {
+  map = L.map("map", { zoomControl:false }).setView([13.756, 100.544], 11);
+  L.control.zoom({ position:"bottomright" }).addTo(map);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution:"© OpenStreetMap", maxZoom:18 }).addTo(map);
+}
+
+async function loadAllData() {
+  try {
+    const [studentsRaw, companiesRaw, teachersRaw] = await Promise.all([
+      fetch('/api/students').then(r=>r.json()),
+      fetch('/api/companies').then(r=>r.json()),
+      fetch('/api/teachers').then(r=>r.json()),
+    ]);
+    const companyMap={};
+    companiesRaw.forEach(c => companyMap[c.company_id]=c);
+    COMPANIES=companiesRaw;
+    TEACHERS=teachersRaw;
+    STUDENTS=studentsRaw.map(s => {
+      const company=s.company_id?companyMap[s.company_id]:null;
+      const fac=FACULTY[s.faculty_id]||{name:"ไม่ทราบ",short:"?",color:"#888",bg:"rgba(136,136,136,0.15)"};
+      return {
+        id:s.student_id, fname:s.first_name, lname:s.last_name, fid:s.faculty_id,
+        fullname:s.first_name+" "+s.last_name, fac,
+        company:company?{id:company.company_id,name:company.company_name,lat:company.latitude,lng:company.longitude,type_id:company.type_id}:null,
+        teacher:s.teacher_name||null, teacher_id:s.teacher_id||null,
+        status:s.status_id?Number(s.status_id):null,
+        score:s.score!=null?Number(s.score):null,
+        eval_:s.score!=null?{score:Number(s.score),comment:s.problem_found}:null,
+        visit_id:s.visit_id||null, internship_id:s.internship_id||null,
+        visit_date:s.visit_date||null,
+      };
+    });
+    applyFilters();
+  } catch(err) {
+    console.error(err);
+    document.getElementById('student-list').innerHTML=`<div class="empty-state">❌ เชื่อมต่อ server ไม่ได้<br><small>กรุณารัน node server.js</small></div>`;
+  }
+}
+
+async function apiPost(url, data) {
+  const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const json=await res.json();
+  if(json.error) throw new Error(json.error);
+  return json;
+}
+async function apiPut(url, data) {
+  const res=await fetch(url,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+  const json=await res.json();
+  if(json.error) throw new Error(json.error);
+  return json;
+}
+
+async function deleteStudent(id) {
+  if(!confirm('ยืนยันลบนักศึกษารหัส '+id+'?')) return;
+  await fetch(`/api/students/${id}`,{method:'DELETE'});
+  selectedId=null;
+  document.getElementById('detail-panel').classList.add('hidden');
+  await loadAllData();
+}
+
+function typeColor(tid) { return ["#3b9eff","#f97316","#22c55e","#f5a623","#a855f7"][(tid-1)%5]; }
+
+function buildMarker(company, students) {
+  const col=typeColor(company.type_id);
+  const icon=L.divIcon({
+    className:"",
+    html:`<div class="pin-marker" style="background:${col}20;border-color:${col}60;"><div class="pin-inner" style="color:${col}">${students.length}</div>${students.length>1?`<div class="pin-count">${students.length}</div>`:""}</div>`,
+    iconSize:[36,36], iconAnchor:[18,36], popupAnchor:[0,-38],
+  });
+  const m=L.marker([company.lat,company.lng],{icon}).addTo(map);
+  const chips=students.map(s=>`<div class="popup-student-chip" onclick="selectStudent('${s.id}')">${s.fname} ${s.lname.slice(0,4)}.</div>`).join("");
+  const scores=students.filter(s=>s.score!=null);
+  const avg=scores.length?(scores.reduce((a,s)=>a+s.score,0)/scores.length).toFixed(1):"-";
+  m.bindPopup(`<div class="popup-title">${company.name}</div><div class="popup-row">ประเภท: <span>${COMPANY_TYPE[company.type_id]||'-'}</span></div><div class="popup-row">นักศึกษา: <span>${students.length} คน</span> · คะแนนเฉลี่ย: <span>${avg}</span></div><div class="popup-students">${chips}</div>`,{maxWidth:280});
+  m.on("click",()=>m.openPopup());
+  return m;
+}
+
+function renderMap(filtered) {
+  Object.values(mapMarkers).forEach(m=>map.removeLayer(m));
+  mapMarkers={};
+  const byCompany={};
+  filtered.forEach(s=>{
+    if(!s.company) return;
+    if(!byCompany[s.company.id]) byCompany[s.company.id]={company:s.company,students:[]};
+    byCompany[s.company.id].students.push(s);
+  });
+  Object.values(byCompany).forEach(({company,students})=>{ mapMarkers[company.id]=buildMarker(company,students); });
+}
+
+function scoreColor(s) { return s==null?"#888":s>=9?"#22c55e":s>=7?"#f5a623":"#ef4444"; }
+
+function renderDetail(student) {
+  const dp=document.getElementById("detail-panel");
+  if(!student){dp.classList.add("hidden");return;}
+  dp.classList.remove("hidden");
+  const {fac,company,status:stat,eval_,teacher,visit_date}=student;
+  const statusInfo=stat?VISIT_STATUS[stat]:null;
+  dp.innerHTML=`
+    <div class="dp-header">
+      <div class="dp-avatar" style="background:${fac.bg};color:${fac.color}">${student.fname[0]}</div>
+      <div>
+        <div class="dp-name">${student.fname} ${student.lname}</div>
+        <div class="dp-id">รหัส: ${student.id}</div>
+        <div style="color:${fac.color};font-size:11px;margin-top:4px"><span style="background:${fac.bg};padding:2px 8px;border-radius:10px;">${fac.name}</span></div>
+      </div>
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">📍 สถานที่ฝึกงาน</div>
+      ${company?`
+        <div class="dp-row"><span class="dp-key">บริษัท</span><span class="dp-val">${company.name}</span></div>
+        <div class="dp-row"><span class="dp-key">ประเภท</span><span class="dp-val">${COMPANY_TYPE[company.type_id]||'-'}</span></div>
+        <div class="dp-row"><span class="dp-key">พิกัด</span><span class="dp-val" style="font-size:11px;color:var(--text2)">${Number(company.lat).toFixed(5)}, ${Number(company.lng).toFixed(5)}</span></div>
+      `:"<div style='color:var(--text2);font-size:12px'>ไม่มีข้อมูล</div>"}
+    </div>
+    <div class="dp-section">
+      <div class="dp-section-title">👨‍🏫 การนิเทศ</div>
+      ${teacher?`
+        <div class="dp-row"><span class="dp-key">อาจารย์นิเทศ</span><span class="dp-val">${teacher}</span></div>
+        ${visit_date?`<div class="dp-row"><span class="dp-key">วันที่นิเทศ</span><span class="dp-val">${visit_date}</span></div>`:""}
+        ${statusInfo?`<div class="status-bar" style="background:${statusInfo.bg};color:${statusInfo.color};margin-top:6px">${stat===3?"✅":stat===2?"🔄":"⏳"} ${statusInfo.name}</div>`:""}
+      `:"<div style='color:var(--text2);font-size:12px'>ไม่มีข้อมูลการนิเทศ</div>"}
+    </div>
+    ${eval_?`
+    <div class="dp-section">
+      <div class="dp-section-title">📊 ผลการประเมิน</div>
+      <div class="score-ring" style="border-color:${scoreColor(eval_.score)};color:${scoreColor(eval_.score)}">${eval_.score}</div>
+      <div style="text-align:center;font-size:11px;color:var(--text2);margin-bottom:8px">คะแนนจากบริษัท / 10</div>
+      <div class="eval-comment">"${eval_.comment||''}"</div>
+    </div>`:""}
+    <div style="padding:12px 16px;display:flex;flex-direction:column;gap:6px;">
+      <button class="action-btn" onclick="flyToStudent('${student.id}')" style="border:1px solid var(--accent);background:rgba(59,158,255,0.08);color:var(--accent);">🗺️ ดูบนแผนที่</button>
+      <button class="action-btn" onclick="showEditModal('${student.id}')" style="border:1px solid var(--gold);background:rgba(245,166,35,0.08);color:var(--gold);">✏️ แก้ไขข้อมูล</button>
+      <button class="action-btn" onclick="deleteStudent('${student.id}')" style="border:1px solid var(--red);background:rgba(239,68,68,0.08);color:var(--red);">🗑️ ลบนักศึกษา</button>
+    </div>`;
+}
+
+// ── MODAL ──
+function showAddModal(){ showStudentModal(null); }
+function showEditModal(id){ showStudentModal(STUDENTS.find(x=>x.id===id)); }
+
+function showStudentModal(student) {
+  const isEdit=!!student;
+  const facOptions=Object.entries(FACULTY).map(([id,f])=>
+    `<option value="${id}" ${student&&student.fid==id?'selected':''}>${f.name}</option>`).join('');
+  const companyOptions=`<option value="">-- ไม่ระบุ --</option>`+COMPANIES.map(c=>
+    `<option value="${c.company_id}" ${student&&student.company&&student.company.id==c.company_id?'selected':''}>${c.company_name}</option>`).join('');
+  const teacherOptions=`<option value="">-- ไม่ระบุ --</option>`+TEACHERS.map(t=>
+    `<option value="${t.teacher_id}" ${student&&student.teacher_id==t.teacher_id?'selected':''}>${t.teacher_name}</option>`).join('');
+  const statusOptions=`<option value="">-- ไม่ระบุ --</option>`+Object.entries(VISIT_STATUS).map(([id,s])=>
+    `<option value="${id}" ${student&&student.status==id?'selected':''}>${s.name}</option>`).join('');
+
+  const div=document.createElement('div');
+  div.className='modal-overlay';
+  div.id='student-modal';
+  div.innerHTML=`
+    <div class="modal-box">
+      <div class="modal-title">${isEdit?'✏️ แก้ไขข้อมูลนักศึกษา':'➕ เพิ่มนักศึกษาใหม่'}</div>
+      <div class="modal-subtitle">${isEdit?`รหัส: ${student.id}`:'กรอกข้อมูลให้ครบถ้วน'}</div>
+
+      <div class="modal-section">ข้อมูลพื้นฐาน</div>
+      ${!isEdit?`
+        <div class="modal-label">รหัสนักศึกษา *</div>
+        <input id="m-id" class="modal-input" placeholder="เช่น 6601051"/>
+      `:''}
+      <div class="modal-row2">
+        <div>
+          <div class="modal-label">ชื่อ *</div>
+          <input id="m-fname" class="modal-input" value="${student?student.fname:''}" placeholder="ชื่อ"/>
+        </div>
+        <div>
+          <div class="modal-label">นามสกุล *</div>
+          <input id="m-lname" class="modal-input" value="${student?student.lname:''}" placeholder="นามสกุล"/>
+        </div>
+      </div>
+      <div class="modal-label">คณะ *</div>
+      <select id="m-faculty" class="modal-input">${facOptions}</select>
+
+      <div class="modal-section">สถานที่ฝึกงาน</div>
+      <div class="modal-label">บริษัทที่ฝึกงาน</div>
+      <select id="m-company" class="modal-input">${companyOptions}</select>
+
+      <div class="modal-section">การนิเทศ</div>
+      <div class="modal-label">อาจารย์นิเทศ</div>
+      <select id="m-teacher" class="modal-input">${teacherOptions}</select>
+      <div class="modal-row2">
+        <div>
+          <div class="modal-label">วันที่นิเทศ</div>
+          <input id="m-visitdate" type="date" class="modal-input" value="${student&&student.visit_date?student.visit_date:''}"/>
+        </div>
+        <div>
+          <div class="modal-label">สถานะนิเทศ</div>
+          <select id="m-status" class="modal-input">${statusOptions}</select>
+        </div>
+      </div>
+
+      <div class="modal-section">ผลการประเมิน</div>
+      <div class="modal-row2">
+        <div>
+          <div class="modal-label">คะแนน (1-10)</div>
+          <input id="m-score" type="number" min="1" max="10" class="modal-input" value="${student&&student.score!=null?student.score:''}" placeholder="เช่น 9"/>
+        </div>
+      </div>
+      <div class="modal-label">ความคิดเห็น / ปัญหาที่พบ</div>
+      <textarea id="m-comment" class="modal-input" rows="3" placeholder="ความคิดเห็นจากบริษัท...">${student&&student.eval_?student.eval_.comment||'':''}</textarea>
+
+      <div class="modal-btn-row">
+        <button class="btn btn-cancel" onclick="closeModal()">ยกเลิก</button>
+        <button class="btn btn-primary" onclick="submitStudentModal(${isEdit?`'${student.id}'`:'null'})">${isEdit?'บันทึก':'เพิ่มนักศึกษา'}</button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  div.addEventListener('click', e=>{ if(e.target===div) closeModal(); });
+}
+
+function closeModal() { const m=document.getElementById('student-modal'); if(m) m.remove(); }
+
+async function submitStudentModal(editId) {
+  const fname     = document.getElementById('m-fname').value.trim();
+  const lname     = document.getElementById('m-lname').value.trim();
+  const faculty_id  = document.getElementById('m-faculty').value;
+  const company_id  = document.getElementById('m-company').value;
+  const teacher_id  = document.getElementById('m-teacher').value;
+  const visit_date  = document.getElementById('m-visitdate').value;
+  const status_id   = document.getElementById('m-status').value;
+  const score     = document.getElementById('m-score').value;
+  const comment   = document.getElementById('m-comment').value.trim();
+
+  if(!fname||!lname){alert('กรุณากรอกชื่อและนามสกุล');return;}
+
+  try {
+    let student_id=editId;
+
+    if(!editId) {
+      student_id=document.getElementById('m-id').value.trim();
+      if(!student_id){alert('กรุณากรอกรหัสนักศึกษา');return;}
+      await apiPost('/api/students',{student_id,first_name:fname,last_name:lname,faculty_id});
+    } else {
+      await apiPut(`/api/students/${editId}`,{first_name:fname,last_name:lname,faculty_id});
+    }
+
+    if(company_id) {
+      const existStudent=STUDENTS.find(x=>x.id===student_id);
+      let internship_id=existStudent?existStudent.internship_id:null;
+      if(!internship_id) {
+        const intern=await apiPost('/api/internships',{student_id,company_id,academic_year:2568});
+        internship_id=intern.internship_id;
+      }
+
+      if(teacher_id||status_id) {
+        const visitData={internship_id,teacher_id:teacher_id||null,visit_date:visit_date||null,status_id:status_id||1};
+        let visit_id;
+        const existVisitId=existStudent?existStudent.visit_id:null;
+        if(existVisitId) {
+          await apiPut(`/api/visits/${existVisitId}`,visitData);
+          visit_id=existVisitId;
+        } else {
+          const v=await apiPost('/api/visits',visitData);
+          visit_id=v.visit_id;
+        }
+
+        if(score) {
+          const evalData={visit_id,score:Number(score),problem_found:comment};
+          if(existStudent&&existStudent.eval_) {
+            const evals=await fetch('/api/evaluations').then(r=>r.json());
+            const ev=evals.find(e=>e.visit_id==visit_id);
+            if(ev) await apiPut(`/api/evaluations/${ev.evaluation_id}`,evalData);
+            else await apiPost('/api/evaluations',evalData);
+          } else {
+            await apiPost('/api/evaluations',evalData);
+          }
+        }
+      }
+    }
+
+    closeModal();
+    await loadAllData();
+    if(student_id) selectStudent(student_id);
+
+  } catch(err) {
+    alert('เกิดข้อผิดพลาด: '+err.message);
+  }
+}
+
+// ── FILTER / LIST ──
+function getFiltered() {
+  return STUDENTS.filter(s=>{
+    if(activeFilters.faculty!=="all"&&s.fid!=activeFilters.faculty) return false;
+    if(activeFilters.status!=="all"&&s.status!=activeFilters.status) return false;
+    if(activeFilters.q){
+      const q=activeFilters.q.toLowerCase();
+      if(!s.fullname.toLowerCase().includes(q)&&!s.id.includes(q)&&
+         !(s.company&&s.company.name.toLowerCase().includes(q))&&
+         !s.fac.name.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderList(filtered) {
+  const el=document.getElementById("student-list");
+  document.getElementById("list-count").textContent=filtered.length;
+  if(!filtered.length){el.innerHTML=`<div class="empty-state">ไม่พบนักศึกษาที่ตรงกับเงื่อนไข</div>`;return;}
+  el.innerHTML=filtered.map(s=>{
+    const statusEmoji=s.status===3?"✅":s.status===2?"🔄":s.status===1?"⏳":"❓";
+    return `
+      <div class="student-item ${s.id===selectedId?"active":""}" onclick="selectStudent('${s.id}')">
+        <div class="avatar" style="background:${s.fac.bg};color:${s.fac.color}">${s.fname[0]}</div>
+        <div class="si-info">
+          <div class="si-name">${s.fname} ${s.lname}</div>
+          <div class="si-company">${s.company?s.company.name:"ไม่มีข้อมูล"}</div>
+        </div>
+        <div class="si-right">
+          ${s.score!=null?`<div class="score-badge" style="background:${scoreColor(s.score)}20;color:${scoreColor(s.score)}">${s.score}/10</div>`:""}
+          <span style="font-size:12px">${statusEmoji}</span>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+function applyFilters() {
+  activeFilters.q=document.getElementById("search").value.trim();
+  const filtered=getFiltered();
+  renderList(filtered);
+  renderMap(filtered);
+  updateStats(filtered);
+}
+function setFaculty(el,val) {
+  activeFilters.faculty=val;
+  document.querySelectorAll("[data-faculty]").forEach(c=>c.classList.remove("active"));
+  el.classList.add("active");
+  applyFilters();
+}
+function setStatus(el,val) {
+  activeFilters.status=val;
+  document.querySelectorAll("[data-status]").forEach(c=>c.classList.remove("active"));
+  el.classList.add("active");
+  applyFilters();
+}
+function selectStudent(id) {
+  selectedId=id;
+  const s=STUDENTS.find(x=>x.id===id);
+  renderDetail(s);
+  applyFilters();
+  if(s&&s.company) map.flyTo([s.company.lat,s.company.lng],14,{duration:0.8});
+  setTimeout(()=>{const el=document.querySelector(".student-item.active");if(el) el.scrollIntoView({behavior:"smooth",block:"center"});},100);
+}
+function flyToStudent(id) {
+  const s=STUDENTS.find(x=>x.id===id);
+  if(s&&s.company){map.flyTo([s.company.lat,s.company.lng],15,{duration:1});setTimeout(()=>{const m=mapMarkers[s.company.id];if(m)m.openPopup();},1100);}
+}
+function updateStats(filtered) {
+  const done=filtered.filter(s=>s.status===3).length;
+  const scores=filtered.filter(s=>s.score!=null).map(s=>s.score);
+  const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1):"-";
+  const cids=new Set(filtered.filter(s=>s.company).map(s=>s.company.id));
+  document.getElementById("stat-students").textContent=filtered.length;
+  document.getElementById("stat-companies").textContent=cids.size;
+  document.getElementById("stat-done").textContent=done;
+  document.getElementById("stat-avg").textContent=avg;
+}
+
+// ── INIT ──
+document.addEventListener('DOMContentLoaded', ()=>{
+  initMap();
+
+  document.getElementById("faculty-chips").innerHTML=
+    `<div class="chip active" data-faculty="all" onclick="setFaculty(this,'all')">ทั้งหมด</div>`+
+    Object.entries(FACULTY).map(([id,f])=>
+      `<div class="chip" data-faculty="${id}" style="border-color:${f.color}20" onclick="setFaculty(this,'${id}')">${f.short}</div>`
+    ).join("");
+
+  const typeColors={"#3b9eff":"IT","#f97316":"อุตสาหกรรม","#22c55e":"บริการ/รัฐ","#f5a623":"ธนาคาร","#a855f7":"ค้าปลีก"};
+  document.getElementById("legend").innerHTML=`<div class="legend-title">ประเภทบริษัท</div>`+
+    Object.entries(typeColors).map(([col,lbl])=>
+      `<div class="legend-row"><div class="legend-dot" style="background:${col}"></div><span style="color:var(--text2)">${lbl}</span></div>`
+    ).join("");
+
+  loadAllData();
+});
+</script>
+</body>
+</html>
