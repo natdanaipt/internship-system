@@ -1,13 +1,21 @@
 const express = require('express');
 const Database = require('better-sqlite3');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
-const db = new Database('internship.db');
+
+// ✅ ใช้ path ให้ปลอดภัยบน server
+const db = new Database(path.join(__dirname, 'internship.db'));
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ✅ route หน้าแรก กันเว็บว่าง
+app.get('/', (req, res) => {
+  res.send('🚀 Internship System API is running!');
+});
 
 // ────────────────────────────────
 // LOOKUP TABLES
@@ -53,7 +61,8 @@ app.get('/api/students', (req, res) => {
 app.post('/api/students', (req, res) => {
   const { student_id, first_name, last_name, faculty_id } = req.body;
   try {
-    db.prepare('INSERT INTO students VALUES (?,?,?,?)').run(student_id, first_name, last_name, faculty_id);
+    db.prepare('INSERT INTO students VALUES (?,?,?,?)')
+      .run(student_id, first_name, last_name, faculty_id);
     res.json({ success: true });
   } catch (e) {
     res.status(400).json({ error: e.message });
@@ -68,7 +77,8 @@ app.put('/api/students/:id', (req, res) => {
 });
 
 app.delete('/api/students/:id', (req, res) => {
-  db.prepare('DELETE FROM students WHERE student_id=?').run(req.params.id);
+  db.prepare('DELETE FROM students WHERE student_id=?')
+    .run(req.params.id);
   res.json({ success: true });
 });
 
@@ -85,20 +95,28 @@ app.get('/api/companies', (req, res) => {
 
 app.post('/api/companies', (req, res) => {
   const { company_name, latitude, longitude, type_id } = req.body;
-  const result = db.prepare('INSERT INTO companies (company_name,latitude,longitude,type_id) VALUES (?,?,?,?)')
-    .run(company_name, latitude, longitude, type_id);
+  const result = db.prepare(`
+    INSERT INTO companies (company_name, latitude, longitude, type_id)
+    VALUES (?,?,?,?)
+  `).run(company_name, latitude, longitude, type_id);
+
   res.json({ success: true, company_id: result.lastInsertRowid });
 });
 
 app.put('/api/companies/:id', (req, res) => {
   const { company_name, latitude, longitude, type_id } = req.body;
-  db.prepare('UPDATE companies SET company_name=?,latitude=?,longitude=?,type_id=? WHERE company_id=?')
-    .run(company_name, latitude, longitude, type_id, req.params.id);
+  db.prepare(`
+    UPDATE companies 
+    SET company_name=?, latitude=?, longitude=?, type_id=? 
+    WHERE company_id=?
+  `).run(company_name, latitude, longitude, type_id, req.params.id);
+
   res.json({ success: true });
 });
 
 app.delete('/api/companies/:id', (req, res) => {
-  db.prepare('DELETE FROM companies WHERE company_id=?').run(req.params.id);
+  db.prepare('DELETE FROM companies WHERE company_id=?')
+    .run(req.params.id);
   res.json({ success: true });
 });
 
@@ -115,20 +133,26 @@ app.get('/api/teachers', (req, res) => {
 
 app.post('/api/teachers', (req, res) => {
   const { teacher_name, faculty_id } = req.body;
-  const result = db.prepare('INSERT INTO teachers (teacher_name,faculty_id) VALUES (?,?)')
-    .run(teacher_name, faculty_id);
+  const result = db.prepare(`
+    INSERT INTO teachers (teacher_name, faculty_id)
+    VALUES (?,?)
+  `).run(teacher_name, faculty_id);
+
   res.json({ success: true, teacher_id: result.lastInsertRowid });
 });
 
 app.put('/api/teachers/:id', (req, res) => {
   const { teacher_name, faculty_id } = req.body;
-  db.prepare('UPDATE teachers SET teacher_name=?,faculty_id=? WHERE teacher_id=?')
-    .run(teacher_name, faculty_id, req.params.id);
+  db.prepare(`
+    UPDATE teachers SET teacher_name=?, faculty_id=? WHERE teacher_id=?
+  `).run(teacher_name, faculty_id, req.params.id);
+
   res.json({ success: true });
 });
 
 app.delete('/api/teachers/:id', (req, res) => {
-  db.prepare('DELETE FROM teachers WHERE teacher_id=?').run(req.params.id);
+  db.prepare('DELETE FROM teachers WHERE teacher_id=?')
+    .run(req.params.id);
   res.json({ success: true });
 });
 
@@ -147,8 +171,11 @@ app.get('/api/internships', (req, res) => {
 
 app.post('/api/internships', (req, res) => {
   const { student_id, company_id, academic_year } = req.body;
-  const result = db.prepare('INSERT INTO internships (student_id,company_id,academic_year) VALUES (?,?,?)')
-    .run(student_id, company_id, academic_year);
+  const result = db.prepare(`
+    INSERT INTO internships (student_id, company_id, academic_year)
+    VALUES (?,?,?)
+  `).run(student_id, company_id, academic_year);
+
   res.json({ success: true, internship_id: result.lastInsertRowid });
 });
 
@@ -171,15 +198,20 @@ app.get('/api/visits', (req, res) => {
 
 app.post('/api/visits', (req, res) => {
   const { internship_id, teacher_id, visit_date, status_id } = req.body;
-  const result = db.prepare('INSERT INTO visits (internship_id,teacher_id,visit_date,status_id) VALUES (?,?,?,?)')
-    .run(internship_id, teacher_id, visit_date, status_id);
+  const result = db.prepare(`
+    INSERT INTO visits (internship_id, teacher_id, visit_date, status_id)
+    VALUES (?,?,?,?)
+  `).run(internship_id, teacher_id, visit_date, status_id);
+
   res.json({ success: true, visit_id: result.lastInsertRowid });
 });
 
 app.put('/api/visits/:id', (req, res) => {
   const { teacher_id, visit_date, status_id } = req.body;
-  db.prepare('UPDATE visits SET teacher_id=?,visit_date=?,status_id=? WHERE visit_id=?')
-    .run(teacher_id, visit_date, status_id, req.params.id);
+  db.prepare(`
+    UPDATE visits SET teacher_id=?, visit_date=?, status_id=? WHERE visit_id=?
+  `).run(teacher_id, visit_date, status_id, req.params.id);
+
   res.json({ success: true });
 });
 
@@ -201,16 +233,26 @@ app.get('/api/evaluations', (req, res) => {
 
 app.post('/api/evaluations', (req, res) => {
   const { visit_id, score, problem_found } = req.body;
-  const result = db.prepare('INSERT INTO evaluations (visit_id,score,problem_found) VALUES (?,?,?)')
-    .run(visit_id, score, problem_found);
+  const result = db.prepare(`
+    INSERT INTO evaluations (visit_id, score, problem_found)
+    VALUES (?,?,?)
+  `).run(visit_id, score, problem_found);
+
   res.json({ success: true, evaluation_id: result.lastInsertRowid });
 });
 
 app.put('/api/evaluations/:id', (req, res) => {
   const { score, problem_found } = req.body;
-  db.prepare('UPDATE evaluations SET score=?,problem_found=? WHERE evaluation_id=?')
-    .run(score, problem_found, req.params.id);
+  db.prepare(`
+    UPDATE evaluations SET score=?, problem_found=? WHERE evaluation_id=?
+  `).run(score, problem_found, req.params.id);
+
   res.json({ success: true });
 });
 
-app.listen(3000, () => console.log('🚀 Server รันที่ http://localhost:3000'));
+// ✅ ใช้ PORT จาก Render
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+});
